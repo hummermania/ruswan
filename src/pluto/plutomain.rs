@@ -1,9 +1,104 @@
 use std::io;
-use std::io::{File, FileMode, fs};
+use std::io::{File, FileMode, fs, stdio};
 
 
 static mut pluto_name: String ="";	/* name (path) we were invoked with */
 static ctlbase: String = "/var/run/pluto";
+static mut pluto_listen: String = "";
+static fork_desired: bool = true;
+
+/* pulled from main for show_setup_plutomain() */
+//static const struct lsw_conf_options *oco;
+static mut coredir: String = "";
+static nhelpers: int = -1;
+//libreswan_passert_fail_t libreswan_passert_fail = passert_fail;
+
+///////////////////////////////////////////////////////////////////////////////////////////////
+
+pub fn free_pluto_main()
+{
+	/* Some values can be NULL if not specified as pluto argument */
+	pfree(coredir);
+	pfreeany(pluto_stats_binary);
+	pfreeany(pluto_listen);
+	pfree(pluto_vendorid);
+}
+
+/*
+ * invocation_fail - print diagnostic and usage hint message and exit
+ *
+ * @param mess String - diagnostic message to print
+ */
+pub fn invocation_fail(mess: String)
+{
+	if mess != Nil {
+		stderr.write_str(mess);
+	}
+	let usage: String = "For usage information: %s --help\n Libreswan %s\n" + 
+	                    pluto_name +
+	                    ipsec_version_code();
+	stderr.write_str(usage);
+	/* not exit_pluto because we are not initialized yet */
+	exit(1);
+}
+
+/* string naming compile-time options that have interop implications */
+static compile_time_interop_options: String = 
+//#ifdef NETKEY_SUPPORT
+	" XFRM(netkey)" +
+
+//#ifdef KLIPS
+	" KLIPS" +
+
+//#ifdef KLIPSMAST
+	" MAST" +
+
+//#ifdef HAVE_NO_FORK
+	" NO_FORK" +
+
+//#ifdef HAVE_BROKEN_POPEN
+	" BROKEN_POPEN" +
+
+	" NSS" +
+//#ifdef DNSSEC
+	" DNSSEC" +
+
+//#ifdef FIPS_CHECK
+	" FIPS_CHECK" +
+
+//#ifdef HAVE_LABELED_IPSEC
+	" LABELED_IPSEC" +
+
+//#ifdef HAVE_LIBCAP_NG
+	" LIBCAP_NG" +
+
+//#ifdef USE_LINUX_AUDIT
+	" LINUX_AUDIT" +
+
+//#ifdef XAUTH_HAVE_PAM
+	" XAUTH_PAM" +
+
+//#ifdef HAVE_NM
+	" NETWORKMANAGER" +
+
+//#ifdef KLIPS_MAST
+	" KLIPS_MAST" +
+
+//#ifdef LIBCURL
+	" CURL(non-NSS)" +
+
+//#ifdef LDAP_VER
+	" LDAP(non-NSS)";
+
+/*
+ * lock file support
+ * - provides convenient way for scripts to find Pluto's pid
+ * - prevents multiple Plutos competing for the same port
+ * - same basename as unix domain control socket
+ * NOTE: will not take account of sharing LOCK_DIR with other systems.
+ */
+//static char pluto_lock[sizeof(ctl_addr.sun_path)] = DEFAULT_CTLBASE LOCK_SUFFIX;
+static pluto_lock_created: bool = false;
 
 /** create lockfile, or die in the attempt */
 fn create_lock() -> int {
@@ -66,164 +161,6 @@ fn create_lock() -> int {
 
 }
 
-
-
-///////////////////////////////////////////////////////////////////////////////////////////////
-
-
-
-
-char *pluto_listen = NULL;
-static bool fork_desired = TRUE;
-
-/* pulled from main for show_setup_plutomain() */
-static const struct lsw_conf_options *oco;
-static char *coredir;
-static int nhelpers = -1;
-
-libreswan_passert_fail_t libreswan_passert_fail = passert_fail;
-
-static void free_pluto_main()
-{
-	/* Some values can be NULL if not specified as pluto argument */
-	pfree(coredir);
-	pfreeany(pluto_stats_binary);
-	pfreeany(pluto_listen);
-	pfree(pluto_vendorid);
-}
-
-/*
- * invocation_fail - print diagnostic and usage hint message and exit
- *
- * @param mess String - diagnostic message to print
- */
-static void invocation_fail(const char *mess)
-{
-	if (mess != NULL)
-		fprintf(stderr, "%s\n", mess);
-	fprintf(stderr, "For usage information: %s --help\n"
-		"Libreswan %s\n",
-		pluto_name, ipsec_version_code());
-	/* not exit_pluto because we are not initialized yet */
-	exit(1);
-}
-
-/* string naming compile-time options that have interop implications */
-static const char compile_time_interop_options[] = ""
-#ifdef NETKEY_SUPPORT
-	" XFRM(netkey)"
-#endif
-#ifdef KLIPS
-	" KLIPS"
-#endif
-#ifdef KLIPSMAST
-	" MAST"
-#endif
-
-#ifdef HAVE_NO_FORK
-	" NO_FORK"
-#endif
-#ifdef HAVE_BROKEN_POPEN
-	" BROKEN_POPEN"
-#endif
-	" NSS"
-#ifdef DNSSEC
-	" DNSSEC"
-#endif
-#ifdef FIPS_CHECK
-	" FIPS_CHECK"
-#endif
-#ifdef HAVE_LABELED_IPSEC
-	" LABELED_IPSEC"
-#endif
-#ifdef HAVE_LIBCAP_NG
-	" LIBCAP_NG"
-#endif
-#ifdef USE_LINUX_AUDIT
-	" LINUX_AUDIT"
-#endif
-#ifdef XAUTH_HAVE_PAM
-	" XAUTH_PAM"
-#endif
-#ifdef HAVE_NM
-	" NETWORKMANAGER"
-#endif
-#ifdef KLIPS_MAST
-	" KLIPS_MAST"
-#endif
-#ifdef LIBCURL
-	" CURL(non-NSS)"
-#endif
-#ifdef LDAP_VER
-	" LDAP(non-NSS)"
-#endif
-;
-
-/*
- * lock file support
- * - provides convenient way for scripts to find Pluto's pid
- * - prevents multiple Plutos competing for the same port
- * - same basename as unix domain control socket
- * NOTE: will not take account of sharing LOCK_DIR with other systems.
- */
-static char pluto_lock[sizeof(ctl_addr.sun_path)] =
-	DEFAULT_CTLBASE LOCK_SUFFIX;
-static bool pluto_lock_created = FALSE;
-
-/* create lockfile, or die in the attempt */
-static int create_lock(void)
-{
-	int fd;
-
-	if (mkdir(ctlbase, 0755) != 0) {
-		if (errno != EEXIST) {
-			fprintf(stderr,
-				"pluto: FATAL: unable to create lock dir: \"%s\": %s\n",
-				ctlbase, strerror(errno));
-			exit_pluto(10);
-		}
-	}
-
-	fd = open(pluto_lock, O_WRONLY | O_CREAT | O_EXCL | O_TRUNC,
-		S_IRUSR | S_IRGRP | S_IROTH);
-
-	if (fd < 0) {
-		if (errno == EEXIST) {
-			/*
-			 * if we did not fork, then we do't really need
-			 * the pid to control, so wipe it
-			 */
-			if (!fork_desired) {
-				if (unlink(pluto_lock) == -1) {
-					fprintf(stderr,
-						"pluto: FATAL: lock file \"%s\" already exists and could not be removed (%d %s)\n",
-						pluto_lock, errno,
-						strerror(errno));
-					exit_pluto(10);
-				} else {
-					/*
-					 * lock file removed,
-					 * try creating it again
-					 */
-					return create_lock();
-				}
-			} else {
-				fprintf(stderr,
-					"pluto: FATAL: lock file \"%s\" already exists\n",
-					pluto_lock);
-				exit_pluto(10);
-			}
-		} else {
-			fprintf(stderr,
-				"pluto: FATAL: unable to create lock file \"%s\" (%d %s)\n",
-				pluto_lock, errno, strerror(errno));
-			exit_pluto(1);
-		}
-	}
-	pluto_lock_created = TRUE;
-	return fd;
-}
-
 /*
  * fill_lock - Populate the lock file with pluto's PID
  *
@@ -231,8 +168,7 @@ static int create_lock(void)
  * @param pid PID (pid_t struct) to be put into the lock file
  * @return bool True if successful
  */
-static bool fill_lock(int lockfd, pid_t pid)
-{
+pub  fn fill_lock(lockfd: int, pid: pid_t) -> bool {
 	char buf[30];	/* holds "<pid>\n" */
 	int len = snprintf(buf, sizeof(buf), "%u\n", (unsigned int) pid);
 	bool ok = len > 0 && write(lockfd, buf, len) == len;
