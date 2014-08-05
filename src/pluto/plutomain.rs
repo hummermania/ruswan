@@ -15,8 +15,7 @@ static nhelpers: int = -1;
 
 ///////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn free_pluto_main()
-{
+pub fn free_pluto_main() {
 	/* Some values can be NULL if not specified as pluto argument */
 	pfree(coredir);
 	pfreeany(pluto_stats_binary);
@@ -29,14 +28,13 @@ pub fn free_pluto_main()
  *
  * @param mess String - diagnostic message to print
  */
-pub fn invocation_fail(mess: String)
-{
+pub fn invocation_fail(mess: &str) {
 	if mess != Nil {
 		stderr.write_str(mess);
 	}
-	let usage: String = "For usage information: %s --help\n Libreswan %s\n" + 
-	                    pluto_name +
-	                    ipsec_version_code();
+	let usage: String = format!("For usage information: {} --help\n Libreswan {}\n" + 
+	                    		pluto_name +
+	                    		ipsec_version_code());
 	stderr.write_str(usage);
 	/* not exit_pluto because we are not initialized yet */
 	exit(1);
@@ -169,19 +167,16 @@ fn create_lock() -> int {
  * @return bool True if successful
  */
 pub  fn fill_lock(lockfd: int, pid: pid_t) -> bool {
-	char buf[30];	/* holds "<pid>\n" */
-	int len = snprintf(buf, sizeof(buf), "%u\n", (unsigned int) pid);
-	bool ok = len > 0 && write(lockfd, buf, len) == len;
+	let buf: &str = format!("{}",pid);	/* holds "<pid>\n" */
 
-	close(lockfd);
-	return ok;
+	lockfd.write_str(buf);
+	lockfd.close();
 }
 
 /*
  * delete_lock - Delete the lock file
  */
-static void delete_lock(void)
-{
+pub fn delete_lock() {
 	if (pluto_lock_created) {
 		delete_ctl_socket();
 		unlink(pluto_lock);	/* is noting failure useful? */
@@ -192,34 +187,58 @@ static void delete_lock(void)
  * parser.l and keywords.c need these global variables
  * FIXME: move them to confread_load() parameters
  */
-int verbose = 0;
-int warningsarefatal = 0;
+static verbose: int = 0;
+static warningsarefatal: int = 0;
 
 /* Read config file. exit() on error. */
-static struct starter_config *read_cfg_file(char *configfile)
-{
-	struct starter_config *cfg = NULL;
-	err_t err = NULL;
+struct starter_config;
+/*struct starter_config {
+	struct {
+		ksf strings;
+		knf options;
+		str_set strings_set;
+		int_set options_set;
+
+		// derived types 
+		char **interfaces;
+	} setup;
+
+	// conn %default 
+	struct starter_conn conn_default;
+
+	struct starter_conn conn_oedefault;
+	bool got_oedefault;
+
+	char *ctlbase;  // location of pluto control socket 
+
+	// connections list (without %default) 
+	TAILQ_HEAD(, starter_conn) conns;
+}; */
+
+pub fn read_cfg_file(configfile: &str) -> starter_config  {
+	let mut cfg: starter_config = Nil;
+	let mut err: err_t = Nil;
 
 	cfg = confread_load(configfile, &err, FALSE, NULL, TRUE);
-	if (cfg == NULL)
+	if cfg == Nil {
 		invocation_fail(err);
-	return cfg;
+	}
+	cfg
 }
 
 /* Helper function for config file mapper: set string option value */
-static void set_cfg_string(char **target, char *value)
-{
+pub fn set_cfg_string(target: &str, value: &str) {
 	/* Do nothing if value is unset. */
-	if (value == NULL || *value == '\0')
+	if value == Nil || *value == "\0" {
 		return;
+	}
 
 	/* Don't free previous target, it might be statically set. */
-	*target = strdup(value);
+	*target = strdup_uniq(value);
 }
 
-static void pluto_init_nss(char *confddir)
-{
+/* TODO: Check the status of crypto libs, and use it in the code
+pub fn pluto_init_nss(confddir: &str) {
 	SECStatus nss_init_status;
 
 	loglog(RC_LOG_SERIOUS, "nss directory plutomain: %s", confddir);
@@ -233,22 +252,22 @@ static void pluto_init_nss(char *confddir)
 		PK11_SetPasswordFunc(getNSSPassword);
 	}
 }
+*/
 
 /* by default the CRL policy is lenient */
-bool strict_crl_policy = FALSE;
+static mut strict_crl_policy: bool = false;
 
 /* 0 is special and default: do not check crls dynamically */
-deltatime_t crl_check_interval = { 0 };
+//deltatime_t crl_check_interval = { 0 };
 
 /* by default pluto sends no cookies in ikev2 or ikev1 aggrmode */
-bool force_busy = FALSE;
+static force_busy: bool = false;
 
 /* whether or not to use klips */
-enum kernel_interface kern_interface = USE_NETKEY;	/* new default */
+//enum kernel_interface kern_interface = USE_NETKEY;	/* new default */
 
-#ifdef HAVE_LABELED_IPSEC
-u_int16_t secctx_attr_value = SECCTX;
-#endif
+//#ifdef HAVE_LABELED_IPSEC
+static secctx_attr_value: u16 = SECCTX;
 
 /*
  * Table of Pluto command-line options.
@@ -272,8 +291,15 @@ u_int16_t secctx_attr_value = SECCTX;
  * val values free due to removal of options: '1', '3', '4', 'G'
  */
  
-#define DBG_OFFSET 256
-static const struct option long_opts[] = {
+//#define DBG_OFFSET 256
+struct option {
+	name: &str,
+	has_arg: has_arg,
+	flag: int,
+	val: &str
+}
+
+static struct option long_opts[] = {
 	/* name, has_arg, flag, val */
 	{ "help\0", no_argument, NULL, 'h' },
 	{ "version\0", no_argument, NULL, 'v' },
