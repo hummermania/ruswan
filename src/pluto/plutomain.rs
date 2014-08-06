@@ -1,7 +1,7 @@
 use std::io;
 use std::io::{File, FileMode, fs, stdio};
 
-
+mod plutomain {
 static mut pluto_name: String ="";	/* name (path) we were invoked with */
 static ctlbase: String = "/var/run/pluto";
 static mut pluto_listen: String = "";
@@ -299,80 +299,82 @@ struct option {
 	val: &str
 }
 
-static struct option long_opts[] = {
+type Option = &[option];
+
+static long_opts: Option = [
 	/* name, has_arg, flag, val */
-	{ "help\0", no_argument, NULL, 'h' },
-	{ "version\0", no_argument, NULL, 'v' },
-	{ "config\0<filename>", required_argument, NULL, 'z' },
-	{ "nofork\0", no_argument, NULL, 'd' },
-	{ "stderrlog\0", no_argument, NULL, 'e' },
-	{ "logfile\0<filename>", required_argument, NULL, 'g' },
-	{ "plutostderrlogtime\0", no_argument, NULL, 't' },
-	{ "force_busy\0_", no_argument, NULL, 'D' },	/* _ */
-	{ "force-busy\0", no_argument, NULL, 'D' },
-	{ "strictcrlpolicy\0", no_argument, NULL, 'r' },
-	{ "crlcheckinterval\0<seconds>", required_argument, NULL, 'x' },
-	{ "uniqueids\0", no_argument, NULL, 'u' },
-	{ "noklips\0>use-nostack", no_argument, NULL, 'n' },	/* redundant spelling */
-	{ "use-nostack\0",  no_argument, NULL, 'n' },
-	{ "use-none\0>use-nostack", no_argument, NULL, 'n' },	/* redundant spelling */
-	{ "useklips\0>use-klips",  no_argument, NULL, 'k' },	/* redundant spelling */
-	{ "use-klips\0",  no_argument, NULL, 'k' },
-	{ "use-auto\0>use-netkey",  no_argument, NULL, 'K' },	/* rednundate spelling (sort of) */
-	{ "usenetkey\0>use-netkey", no_argument, NULL, 'K' },	/* redundant spelling */
-	{ "use-netkey\0", no_argument, NULL, 'K' },
-	{ "use-mast\0",   no_argument, NULL, 'M' },
-	{ "use-mastklips\0",   no_argument, NULL, 'M' },
-	{ "use-bsdkame\0",   no_argument, NULL, 'F' },
-	{ "interface\0<ifname|ifaddr>", required_argument, NULL, 'i' },
-	{ "listen\0<ifaddr>", required_argument, NULL, 'L' },
-	{ "ikeport\0<port-number>", required_argument, NULL, 'p' },
-	{ "natikeport\0<port-number>", required_argument, NULL, 'q' },
-	{ "ctlbase\0<path>", required_argument, NULL, 'b' },
-	{ "secretsfile\0<secrets-file>", required_argument, NULL, 's' },
-	{ "perpeerlogbase\0<path>", required_argument, NULL, 'P' },
-	{ "perpeerlog\0", no_argument, NULL, 'l' },
-	{ "noretransmits\0", no_argument, NULL, 'R' },
-	{ "coredir\0>dumpdir", required_argument, NULL, 'C' },	/* redundant spelling */
-	{ "dumpdir\0<dirname>", required_argument, NULL, 'C' },
-	{ "statsbin\0<filename>", required_argument, NULL, 'S' },
-	{ "ipsecdir\0<ipsec-dir>", required_argument, NULL, 'f' },
-	{ "ipsec_dir\0>ipsecdir", required_argument, NULL, 'f' },	/* redundant spelling; _ */
-	{ "foodgroupsdir\0>ipsecdir", required_argument, NULL, 'f' },	/* redundant spelling */
-	{ "adns\0<pathname>", required_argument, NULL, 'a' },
-	{ "nat_traversal\0!", no_argument, NULL, 'h' },	/* obsolete; _ */
-	{ "keep_alive\0_", required_argument, NULL, '2' },	/* _ */
-	{ "keep-alive\0<delay_secs>", required_argument, NULL, '2' },
-	{ "force_keepalive\0!", no_argument, NULL, 'h' },	/* obsolete; _ */
-	{ "disable_port_floating\0!", no_argument, NULL, 'h' },	/* obsolete; _ */
-	{ "virtual_private\0_", required_argument, NULL, '6' },	/* _ */
-	{ "virtual-private\0<network_list>", required_argument, NULL, '6' },
-	{ "nhelpers\0<number>", required_argument, NULL, 'j' },
-#ifdef HAVE_LABELED_IPSEC
-	{ "secctx_attr_value\0_", required_argument, NULL, 'w' },	/* _ */
-	{ "secctx-attr-value\0<number>", required_argument, NULL, 'w' },
-#endif
-	{ "vendorid\0<vendorid>", required_argument, NULL, 'V' },
+	{ "help\0"; no_argument; NULL; 'h' },
+	{ "version\0"; no_argument; NULL; 'v' },
+	{ "config\0<filename>"; required_argument; NULL; 'z' },
+	{ "nofork\0"; no_argument; NULL; 'd' },
+	{ "stderrlog\0"; no_argument; NULL; 'e' },
+	{ "logfile\0<filename>"; required_argument; NULL; 'g' },
+	{ "plutostderrlogtime\0"; no_argument; NULL; 't' },
+	{ "force_busy\0_"; no_argument; NULL; 'D' },	/* _ */
+	{ "force-busy\0"; no_argument; NULL; 'D' },
+	{ "strictcrlpolicy\0"; no_argument; NULL; 'r' },
+	{ "crlcheckinterval\0<seconds>"; required_argument; NULL; 'x' },
+	{ "uniqueids\0"; no_argument; NULL; 'u' },
+	{ "noklips\0>use-nostack"; no_argument; NULL; 'n' },	/* redundant spelling */
+	{ "use-nostack\0";  no_argument; NULL; 'n' },
+	{ "use-none\0>use-nostack"; no_argument; NULL; 'n' },	/* redundant spelling */
+	{ "useklips\0>use-klips";  no_argument; NULL; 'k' },	/* redundant spelling */
+	{ "use-klips\0";  no_argument; NULL; 'k' },
+	{ "use-auto\0>use-netkey";  no_argument; NULL; 'K' },	/* rednundate spelling (sort of) */
+	{ "usenetkey\0>use-netkey"; no_argument; NULL; 'K' },	/* redundant spelling */
+	{ "use-netkey\0"; no_argument; NULL; 'K' },
+	{ "use-mast\0";   no_argument; NULL; 'M' },
+	{ "use-mastklips\0";   no_argument; NULL; 'M' },
+	{ "use-bsdkame\0";   no_argument; NULL; 'F' },
+	{ "interface\0<ifname|ifaddr>"; required_argument; NULL; 'i' },
+	{ "listen\0<ifaddr>"; required_argument; NULL; 'L' },
+	{ "ikeport\0<port-number>"; required_argument; NULL; 'p' },
+	{ "natikeport\0<port-number>"; required_argument; NULL; 'q' },
+	{ "ctlbase\0<path>"; required_argument; NULL; 'b' },
+	{ "secretsfile\0<secrets-file>"; required_argument; NULL; 's' },
+	{ "perpeerlogbase\0<path>"; required_argument; NULL; 'P' },
+	{ "perpeerlog\0"; no_argument; NULL; 'l' },
+	{ "noretransmits\0"; no_argument; NULL; 'R' },
+	{ "coredir\0>dumpdir"; required_argument; NULL; 'C' },	/* redundant spelling */
+	{ "dumpdir\0<dirname>"; required_argument; NULL; 'C' },
+	{ "statsbin\0<filename>"; required_argument; NULL; 'S' },
+	{ "ipsecdir\0<ipsec-dir>"; required_argument; NULL; 'f' },
+	{ "ipsec_dir\0>ipsecdir"; required_argument; NULL; 'f' },	/* redundant spelling; _ */
+	{ "foodgroupsdir\0>ipsecdir"; required_argument; NULL; 'f' },	/* redundant spelling */
+	{ "adns\0<pathname>"; required_argument; NULL; 'a' },
+	{ "nat_traversal\0!"; no_argument; NULL; 'h' },	/* obsolete; _ */
+	{ "keep_alive\0_"; required_argument; NULL; '2' },	/* _ */
+	{ "keep-alive\0<delay_secs>"; required_argument; NULL; '2' },
+	{ "force_keepalive\0!"; no_argument; NULL; 'h' },	/* obsolete; _ */
+	{ "disable_port_floating\0!"; no_argument; NULL; 'h' },	/* obsolete; _ */
+	{ "virtual_private\0_"; required_argument; NULL; '6' },	/* _ */
+	{ "virtual-private\0<network_list>"; required_argument; NULL; '6' },
+	{ "nhelpers\0<number>"; required_argument; NULL; 'j' },
+//#ifdef HAVE_LABELED_IPSEC
+	{ "secctx_attr_value\0_"; required_argument; NULL; 'w' },	/* _ */
+	{ "secctx-attr-value\0<number>"; required_argument; NULL; 'w' },
+//#endif
+	{ "vendorid\0<vendorid>"; required_argument; NULL; 'V' },
 
-	{ "leak-detective\0", no_argument, NULL, 'X' },
-	{ "debug-nat_t\0>debug-nattraversal", no_argument, NULL, '5' },	/* redundant spelling; _ */
-	{ "debug-nat-t\0>debug-nattraversal", no_argument, NULL, '5' },	/* redundant spelling */
-	{ "debug-nattraversal\0", no_argument, NULL, '5' },
-	{ "debug-none\0^", no_argument, NULL, 'N' },
-	{ "debug-all\0", no_argument, NULL, 'A' },
+	{ "leak-detective\0"; no_argument; NULL; 'X' },
+	{ "debug-nat_t\0>debug-nattraversal"; no_argument; NULL; '5' },	/* redundant spelling; _ */
+	{ "debug-nat-t\0>debug-nattraversal"; no_argument; NULL; '5' },	/* redundant spelling */
+	{ "debug-nattraversal\0"; no_argument; NULL; '5' },
+	{ "debug-none\0^"; no_argument; NULL; 'N' },
+	{ "debug-all\0"; no_argument; NULL; 'A' }
 
-	/* --debug-* options (using D for shorthand) */
+	/* --debug-* options (using D for shorthand) 
 #define D(name, code) { "debug-" name, no_argument, NULL, (code) + DBG_OFFSET }
 	D("raw\0", DBG_RAW_IX),
 	D("crypt\0", DBG_CRYPT_IX),
-	D("crypto\0>crypt", DBG_CRYPT_IX),	/* redundant spelling */
+	D("crypto\0>crypt", DBG_CRYPT_IX),	// redundant spelling 
 	D("parsing\0", DBG_PARSING_IX),
 	D("emitting\0", DBG_EMITTING_IX),
 	D("control\0", DBG_CONTROL_IX),
 	D("lifecycle\0", DBG_LIFECYCLE_IX),
 	D("kernel\0", DBG_KERNEL_IX),
-	D("klips\0>kernel", DBG_KERNEL_IX),	/* redundant spelling */
-	D("netkey\0>kernel", DBG_KERNEL_IX),	/* redundant spelling */
+	D("klips\0>kernel", DBG_KERNEL_IX),	// redundant spelling 
+	D("netkey\0>kernel", DBG_KERNEL_IX),	// redundant spelling 
 	D("dns\0", DBG_DNS_IX),
 	D("oppo\0", DBG_OPPO_IX),
 	D("oppoinfo\0", DBG_OPPOINFO_IX),
@@ -383,7 +385,7 @@ static struct option long_opts[] = {
 	D("pfkey\0", DBG_PFKEY_IX),
 #undef D
 
-	/* --impair-* options (using I for shorthand) */
+	// --impair-* options (using I for shorthand) 
 #define I(name, code) { "impair-" name, no_argument, NULL, (code) + DBG_OFFSET }
 	I("delay-adns-key-answer\0^", IMPAIR_DELAY_ADNS_KEY_ANSWER_IX),
 	I("delay-adns-txt-answer\0", IMPAIR_DELAY_ADNS_TXT_ANSWER_IX),
@@ -399,8 +401,8 @@ static struct option long_opts[] = {
 	I("send-ikev2-ke\0", IMPAIR_SEND_IKEv2_KE_IX),
 	I("send-key-size-check\0", IMPAIR_SEND_KEY_SIZE_CHECK_IX),
 #undef I
-	{ 0, 0, 0, 0 }
-};
+	{ 0, 0, 0, 0 } */
+];
 
 /* print full usage (from long_opts[]) */
 static void usage(void)
@@ -558,3 +560,5 @@ void show_setup_plutomain()
 	whack_log(RC_COMMENT, "secctx-attr-value=<unsupported>");
 #endif
 }
+
+} // end mod plutomain
