@@ -405,13 +405,12 @@ static long_opts: Option = [
 ];
 
 /* print full usage (from long_opts[]) */
-static void usage(void)
-{
-	const struct option *opt;
-	char line[72];
-	size_t lw;
+pub fn usage() {
+	let mut opt: option = Nil;
+	let mut line: String;
+	let lw: size_t;
 
-	snprintf(line, sizeof(line), "Usage: %s", pluto_name);
+	println("Usage: {}", pluto_name);
 	lw = strlen(line);
 
 	for (opt = long_opts; opt->name != NULL; opt++) {
@@ -451,9 +450,9 @@ static void usage(void)
 		}
 	}
 
-	fprintf(stderr, "%s\n", line);
+	stderr.write_str("{}\n", line);
 
-	fprintf(stderr, "Libreswan %s\n", ipsec_version_code());
+	stderr.write_str("Libreswan {}\n", ipsec_version_code());
 	/* not exit_pluto because we are not initialized yet */
 	exit(0);
 }
