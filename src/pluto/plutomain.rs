@@ -413,6 +413,7 @@ pub fn usage() {
 	println("Usage: {}", pluto_name);
 	lw = strlen(line);
 
+	/*
 	for (opt = long_opts; opt->name != NULL; opt++) {
 		const char *nm = opt->name;
 		const char *meta = nm + strlen(nm) + 1;
@@ -424,12 +425,12 @@ pub fn usage() {
 		case '_':
 		case '>':
 		case '!':
-			/* ignore these entries */
+			// ignore these entries 
 			break;
 		case '^':
 			force_nl = TRUE;
-			meta++;	/* eat ^ */
-			/* fall through */
+			meta++;	// eat ^ 
+			// fall through 
 		default:
 			if (*meta == '\0')
 				snprintf(chunk, sizeof(chunk),  "[--%s]", nm);
@@ -453,7 +454,8 @@ pub fn usage() {
 	stderr.write_str("{}\n", line);
 
 	stderr.write_str("Libreswan {}\n", ipsec_version_code());
-	/* not exit_pluto because we are not initialized yet */
+	// not exit_pluto because we are not initialized yet 
+	*/
 	exit(0);
 }
 
@@ -470,8 +472,7 @@ fn main() {
  *  1 general discomfort
  * 10 lock file exists
  */
-void exit_pluto(int status)
-{
+pub fn exit_pluto(status:int) {
 	/* needed because we may be called in odd state */
 	reset_globals();
 	free_preshared_secrets();
@@ -483,9 +484,9 @@ void exit_pluto(int status)
 	 * forget to do this.
 	 */
 
-#if defined(LIBCURL) || defined(LDAP_VER)
+//#if defined(LIBCURL) || defined(LDAP_VER)
 	free_crl_fetch();	/* free chain of crl fetch requests */
-#endif
+//#endif
 	/* free chain of X.509 authority certificates */
 	free_authcerts();
 	free_crls();	/* free chain of X.509 CRLs */
@@ -503,23 +504,23 @@ void exit_pluto(int status)
 	free_pluto_main();	/* our static chars */
 
 	/* report memory leaks now, after all free()s */
-	if(leak_detective)
+	if leak_detective {
 		report_leaks();
+	}
 
 	close_log();	/* close the logfiles */
 	exit(status);	/* exit, with our error code */
 }
 
-void show_setup_plutomain()
-{
+pub fn show_setup_plutomain() {
 	whack_log(RC_COMMENT, "config setup options:");	/* spacer */
 	whack_log(RC_COMMENT, " ");	/* spacer */
 	whack_log(RC_COMMENT,
 		"configdir=%s, configfile=%s, secrets=%s, ipsecdir=%s, dumpdir=%s, statsbin=%s",
-		oco->confdir,
-		oco->conffile,
+		oco.confdir,
+		oco.conffile,
 		pluto_shared_secrets_file,
-		oco->confddir,
+		oco.confddir,
 		coredir,
 		match pluto_stats_binary {
 			Nil => "unset",
@@ -553,11 +554,11 @@ void show_setup_plutomain()
 		match pluto_listen { true => pluto_listen, false => "<any>"}
 	);
 
-#ifdef HAVE_LABELED_IPSEC
+//#ifdef HAVE_LABELED_IPSEC
 	whack_log(RC_COMMENT, "secctx-attr-value=%d", secctx_attr_value);
-#else
+//#else
 	whack_log(RC_COMMENT, "secctx-attr-value=<unsupported>");
-#endif
+//#endif
 }
 
 } // end mod plutomain
