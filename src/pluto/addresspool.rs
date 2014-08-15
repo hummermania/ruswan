@@ -26,6 +26,7 @@
  * used for more than one connection.
  */
 
+/*
 #include "libreswan.h"
 #include "lswalloc.h"
 #include "lswlog.h"
@@ -33,7 +34,9 @@
 #include "defs.h"
 #include "constants.h"
 #include "addresspool.h"
+*/
 
+mod addresspool {
 
 /*
  * A pool is a range of IPv4 addresses to be individually allocated.
@@ -44,15 +47,14 @@
  * This list is in monotonically increasing order.
  */
 struct ip_pool {
-	unsigned pool_refcount;	/* reference counted! */
-	ip_range r;
-	u_int32_t size;		/* number of addresses within range */
-	u_int32_t used;		/* number of addresses in use (includes lingering) */
-	u_int32_t lingering;	/* number of lingering addresses */
-	struct lease_addr *leases;	/* monotonically increasing index values */
-
-	struct ip_pool *next;	/* next pool */
-};
+	pool_refcount : uint,	/* reference counted! */
+	r: ip_range,
+	size: u32,		/* number of addresses within range */
+	used: u32,		/* number of addresses in use (includes lingering) */
+	lingering: u32,	/* number of lingering addresses */
+	leases: lease_addr,	/* monotonically increasing index values */
+	next: ip_pool	/* next pool */
+}
 
 /*
  * A lease is an assignment of a single address from a particular pool.
@@ -83,47 +85,48 @@ struct ip_pool {
  *   ??? This constitutes a leak.
  */
 
-#define	could_share_lease(c) ((c)->spd.that.id.kind != ID_NONE && uniqueIDs)
+pub fn could_share_lease(c: connection) { 
+	c.spd.that.id.kind != ID_NONE && uniqueIDs
+}
 
 struct lease_addr {
-	u_int32_t index;	/* range start + index == IP address */
-	struct id thatid;	/* from connection */
-	unsigned refcnt;	/* reference counted */
-	monotime_t lingering_since;	/* when did this begin to linger */
+	index: u32,	/* range start + index == IP address */
+	thatid: id,	/* from connection */    /* TODO: id - type struct, from include/id.h */
+	refcnt: uint,	/* reference counted */
+	lingering_since: monotime_t,	/* when did this begin to linger */   /* TODO: type from  <time.h> */
 
-	struct lease_addr *next;	/* next in pool's list of leases */
-};
+	next: lease_addr	/* next in pool's list of leases */
+}
 
 /*
  * head of chained addresspool list
  * addresspool come from ipsec.conf or whacked connection.
  */
-static struct ip_pool *pluto_pools = NULL;
+static pluto_pools: ip_pool = Nil;
 
 /* note: free_lease_entry returns a pointer to h's list successor.
  * The caller MUST use this to replace the linked list's pointer to h.
  */
-static struct lease_addr *free_lease_entry(struct lease_addr *h) MUST_USE_RESULT;
-
-static struct lease_addr *free_lease_entry(struct lease_addr *h)
+pub fn free_lease_entry(h: lease_addr) -> lease_addr
 {
-	struct lease_addr *next = h->next;
+	let mut next: lease_addr = h.next;
 
 	DBG(DBG_CONTROL, DBG_log("addresspool free lease entry ptr %p refcnt %u",
-		h, h->refcnt));
+		h, h.refcnt));
 
-	free_id_content(&h->thatid);
-	pfree(h);
+	free_id_content(h.thatid);
+	//pfree(h);
 	return next;
 }
 
-static void free_lease_list(struct lease_addr **head)
+pub fn free_lease_list(mut head: lease_addr)
 {
 	DBG(DBG_CONTROL,
 	    DBG_log("%s: addresspool free the lease list ptr %p",
-		    __func__, *head));
-	while (*head != NULL)
-		*head = free_lease_entry(*head);
+		    __func__, head));
+	while head != Nil {
+		head = free_lease_entry(head);
+	}
 }
 
 /*
@@ -134,8 +137,9 @@ static void free_lease_list(struct lease_addr **head)
  * It the index isn't found, NULL is returned (not a pointer to the
  * pointer to NULL).
  */
-
-static struct lease_addr **ref_to_lease(struct ip_pool *pool, u_int32_t i) {
+// TODO: convert returning C type 'pointer to the pointer' to Rust type
+pub fn ref_to_lease(pool: ip_pool, i: u32 ) -> lease_addr {
+	/*
 	struct lease_addr **pp;
 	struct lease_addr *p;
 
@@ -143,6 +147,8 @@ static struct lease_addr **ref_to_lease(struct ip_pool *pool, u_int32_t i) {
 		if (p->index == i)
 			return pp;
 	return NULL;
+	*/
+	Nil
 }
 
 /*
@@ -159,17 +165,17 @@ static struct lease_addr **ref_to_lease(struct ip_pool *pool, u_int32_t i) {
  * Note: without sharing the refcnt should be 1.
  */
 
-void rel_lease_addr(struct connection *c)
-{
-	struct ip_pool *pool = c->pool;
-	u_int32_t i;	/* index within range of IPv4 address to be released */
-	unsigned refcnt;	/* for DBG logging */
-	const char *story;	/* for DBG logging */
+pub fn rel_lease_addr(c: connection) {
+	let pool: ip_pool = c.pool;
+	let i: u32;	/* index within range of IPv4 address to be released */
+	let refcnt: uint;	/* for DBG logging */
+	let story: &str;	/* for DBG logging */
 
-	if (!c->spd.that.has_lease)
+	if !c->spd.that.has_lease {
 		return; /* it is not from the addresspool to free */
+	}
 
-	passert(addrtypeof(&c->spd.that.client.addr) == AF_INET);
+	passert(addrtypeof(&c.spd.that.client.addr) == AF_INET);
 
 	/* i is index of client.addr within pool's range.
 	 * Using unsigned arithmetic means that if client.addr is less than
@@ -400,7 +406,7 @@ err_t lease_an_address(const struct connection *c,
 		addrtot(ipa, 0, lbuf, sizeof(lbuf));
 
 		DBG_log("%s lease %s from addresspool %s to that.client.addr %s thatid '%s'",
-			s ? "re-use" : "new",
+			match s { true => "re-use", false => "new"},
 			lbuf, rbuf, abuf, thatidbuf);
 	});
 
@@ -475,8 +481,9 @@ err_t find_addresspool(const ip_range *pool_range, struct ip_pool **pool)
 			/* exact match */
 			*pool = h;
 			break;
-		} else if (sc < 0 ? addrcmp(&a->end, &b->start) < 0 :
-				    addrcmp(&a->start, &b->end) > 0) {
+		} else if (match sc < 0 { 
+					true => addrcmp(&a->end, &b->start) < 0,
+					false => addrcmp(&a->start, &b->end) > 0 }) {
 			/* before or after */
 		} else {
 			/* overlap */
@@ -544,3 +551,5 @@ struct ip_pool *install_addresspool(const ip_range *pool_range)
 	}
 	return p;
 }
+
+}  // End mod addresspool
