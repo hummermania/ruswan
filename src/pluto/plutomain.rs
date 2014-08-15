@@ -41,7 +41,7 @@ pub fn invocation_fail(mess: &str) {
 }
 
 /* string naming compile-time options that have interop implications */
-static compile_time_interop_options: String = 
+static compile_time_interop_options: &str = 
 //#ifdef NETKEY_SUPPORT
 	" XFRM(netkey)" +
 
@@ -292,16 +292,17 @@ static secctx_attr_value: u16 = SECCTX;
  */
  
 //#define DBG_OFFSET 256
-struct option {
+struct Option {
 	name: &str,
 	has_arg: has_arg,
 	flag: int,
 	val: &str
 }
 
-type Option = &[option];
+//#define D(name, code) { "debug-" name, no_argument, NULL, (code) + DBG_OFFSET }
+static debug = |name: &str, code:int| -> Option { {"debug-" + name, no_argument, NULL, code + DBG_OFFSET} }
 
-static long_opts: Option = [
+static long_opts: &[Option] = [
 	/* name, has_arg, flag, val */
 	{ "help\0"; no_argument; NULL; 'h' },
 	{ "version\0"; no_argument; NULL; 'v' },
@@ -460,9 +461,6 @@ pub fn usage() {
 }
 
 
-fn main() {
-}
-
 /*
  * leave pluto, with status.
  * Once child is launched, parent must not exit this way because
@@ -562,3 +560,6 @@ pub fn show_setup_plutomain() {
 }
 
 } // end mod plutomain
+
+fn main() {
+}
