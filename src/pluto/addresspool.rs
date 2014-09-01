@@ -36,6 +36,8 @@
 #include "addresspool.h"
 */
 
+use std::mem;
+
 mod addresspool {
 
 /*
@@ -89,6 +91,10 @@ pub fn could_share_lease(c: connection) {
 	c.spd.that.id.kind != ID_NONE && uniqueIDs
 }
 
+struct monotime_t { 
+	mono_secs: time_t 
+}
+
 struct lease_addr {
 	index: u32,	/* range start + index == IP address */
 	thatid: id,	/* from connection */    /* TODO: id - type struct, from include/id.h */
@@ -102,7 +108,7 @@ struct lease_addr {
  * head of chained addresspool list
  * addresspool come from ipsec.conf or whacked connection.
  */
-static pluto_pools: ip_pool = Nil;
+static mut pluto_pools: ip_pool = None;
 
 /* note: free_lease_entry returns a pointer to h's list successor.
  * The caller MUST use this to replace the linked list's pointer to h.
@@ -124,7 +130,7 @@ pub fn free_lease_list(mut head: lease_addr)
 	DBG(DBG_CONTROL,
 	    DBG_log("%s: addresspool free the lease list ptr %p",
 		    __func__, head));
-	while head != Nil {
+	while head != None {
 		head = free_lease_entry(head);
 	}
 }
@@ -137,18 +143,17 @@ pub fn free_lease_list(mut head: lease_addr)
  * It the index isn't found, NULL is returned (not a pointer to the
  * pointer to NULL).
  */
-// TODO: convert returning C type 'pointer to the pointer' to Rust type
-pub fn ref_to_lease(pool: ip_pool, i: u32 ) -> lease_addr {
-	/*
-	struct lease_addr **pp;
-	struct lease_addr *p;
+pub fn ref_to_lease(pool: ip_pool, i: u32 ) -> Box<Box<lease_addr>> {
+	
+	let pp: Box<Box<lease_addr>>; // TODO: Check if double boxed is realy needed 
+	let p: Box<lease_addr>;
 
-	for (pp = &pool->leases; (p = *pp) != NULL; pp = &p->next)
-		if (p->index == i)
+	for pp in  &pool.leases {
+		if p.index == i {
 			return pp;
-	return NULL;
-	*/
-	Nil
+		}
+	}
+	return None;
 }
 
 /*
@@ -165,13 +170,13 @@ pub fn ref_to_lease(pool: ip_pool, i: u32 ) -> lease_addr {
  * Note: without sharing the refcnt should be 1.
  */
 
-pub fn rel_lease_addr(c: connection) {
+pub fn rel_lease_addr(c: &connection) {
 	let pool: ip_pool = c.pool;
 	let i: u32;	/* index within range of IPv4 address to be released */
 	let refcnt: uint;	/* for DBG logging */
 	let story: &str;	/* for DBG logging */
 
-	if !c->spd.that.has_lease {
+	if !c.spd.that.has_lease {
 		return; /* it is not from the addresspool to free */
 	}
 
@@ -183,14 +188,14 @@ pub fn rel_lease_addr(c: connection) {
 	 * Therefore a single test against size will indicate
 	 * membership in the range.
 	 */
-	i = ntohl(c->spd.that.client.addr.u.v4.sin_addr.s_addr) -
-	    ntohl(pool->r.start.u.v4.sin_addr.s_addr);
+	i = ntohl(c.spd.that.client.addr.u.v4.sin_addr.s_addr) -
+	    ntohl(pool.r.start.u.v4.sin_addr.s_addr);
 
-	passert(i < pool->size);
+	passert(i < pool.size);
 
 	{
-		struct lease_addr **pp = ref_to_lease(pool, i);
-		struct lease_addr *p;
+		let pp: Box<Box<lease_addr>> = ref_to_lease(pool, i);
+		let p: Box<lease_addr>;
 
 		passert(pp != NULL);	/* not found */
 
@@ -199,39 +204,39 @@ pub fn rel_lease_addr(c: connection) {
 		if (could_share_lease(c)) {
 			/* we could share, so leave lease lingering */
 			story = "left (shared)";
-			passert(p->refcnt > 0);
-			p->refcnt--;
-			if (p->refcnt == 0) {
+			passert(p.refcnt > 0);
+			p.refcnt -= 1;
+			if (p.refcnt == 0) {
 				story = "left (to linger)";
-				pool->lingering++;
-				p->lingering_since = mononow();
+				pool.lingering += 1;
+				p.lingering_since = mononow();
 			}
-			refcnt = p->refcnt;
+			refcnt = p.refcnt;
 		} else {
 			/* cannot share: free it */
 			story = "freed";
-			passert(p->refcnt == 1);
-			p->refcnt--;
-			refcnt = p->refcnt;
+			passert(p.refcnt == 1);
+			p.refcnt -= 1;
+			refcnt = p.refcnt;
 			*pp = free_lease_entry(p);
-			pool->used--;
+			pool.used -= 1;
 		}
 	}
 
-	c->spd.that.has_lease = FALSE;
+	c.spd.that.has_lease = FALSE;
 
 	DBG(DBG_CONTROLMORE, {
 		/* text of addresses */
-		char ta_client[ADDRTOT_BUF];
-		char ta_range[RANGETOT_BUF];
+		let ta_client: [char, ..ADDRTOT_BUF];
+		let ta_range:  [char, ..RANGETOT_BUF];
 
-		addrtot(&c->spd.that.client.addr, 0, ta_client, sizeof(ta_client));
-		rangetot(&pool->r, 0, ta_range, sizeof(ta_range));
+		addrtot(&c.spd.that.client.addr, 0, ta_client, mem::size_of_val(ta_client));
+		rangetot(&pool.r, 0, ta_range, mem::size_of_val(ta_range));
 		DBG_log("%s lease refcnt %u %s from addresspool %s index=%u. pool size %u used %u lingering=%u address",
 				story,
 				refcnt, ta_client, ta_range, i,
-				pool->size, pool->used,
-				pool->lingering);
+				pool.size, pool.used,
+				pool.lingering);
 	});
 }
 
@@ -239,46 +244,44 @@ pub fn rel_lease_addr(c: connection) {
  * return previous lease if there is one lingering for the same ID
  * but only if uniqueIDs, and ID_NONE does not count.
  */
-static bool share_lease(const struct connection *c,
-			u_int32_t *index /*result*/)
-{
-	struct lease_addr *p;
-	bool r = FALSE;
+pub fn share_lease(c: &connection, index: u32) -> bool {
+	let mut p: Box<lease_addr>;
+	let mut r: bool = FALSE;
 
-	if (!could_share_lease(c))
+	if !could_share_lease(c) {
 		return FALSE;
+	}
 
-	for (p = c->pool->leases; p != NULL; p = p->next) {
-		if (same_id(&p->thatid, &c->spd.that.id)) {
-			*index = p->index;
-			if (p->refcnt == 0) {
-				c->pool->lingering--;
-				c->pool->used++;
+	for p in c.pool.leases {
+		if (same_id(&p.thatid, &c.spd.that.id)) {
+			*index = p.index;
+			if (p.refcnt == 0) {
+				c.pool.lingering -= 1;
+				c.pool.used += 1;
 			}
-			p->refcnt++;
+			p.refcnt +=1;
 			r = TRUE;
 			break;
 		}
 	}
 
 	DBG(DBG_CONTROLMORE, {
-			char thatid[IDTOA_BUF];
+			let thatid: [char, ..IDTOA_BUF];
 
-			idtoa(&c->spd.that.id, thatid, sizeof(thatid));
+			idtoa(&c.spd.that.id, thatid, mem::size_of_val(thatid));
 			if (r) {
-				char abuf[ADDRTOT_BUF];
-				ip_address ipaddr;
-				uint32_t addr = ntohl(c->pool->r.start.u.v4.sin_addr.s_addr) + *index;
-				uint32_t addr_nw = htonl(addr);
+				let abuf: [char, ..ADDRTOT_BUF];
+				let ip_address: ipaddr;
+				let addr: u32 = ntohl(c.pool.r.start.u.v4.sin_addr.s_addr) + *index;
+				let addr_nw: u32 = htonl(addr);
 
-				initaddr((unsigned char *)&addr_nw,
-					sizeof(addr_nw), AF_INET, &ipaddr);
-				addrtot(&ipaddr, 0, abuf, sizeof(abuf));
+				initaddr(&addr_nw, mem::size_of_val(addr_nw), AF_INET, &ipaddr);
+				addrtot(&ipaddr, 0, abuf, mem::size_of_val(abuf));
 
 				DBG_log("in %s: found a lingering addresspool lease %s refcnt %d for '%s'",
 					__func__,
 					abuf,
-					p->refcnt,
+					p.refcnt,
 					thatid);
 			} else {
 				DBG_log("in %s: no lingering addresspool lease for '%s'",
@@ -290,28 +293,27 @@ static bool share_lease(const struct connection *c,
 	return r;
 }
 
-err_t lease_an_address(const struct connection *c,
-		     ip_address *ipa /*result*/)
-{
+pub fn lease_an_address(c: &connection, 
+						ipa: ip_address  ) -> err_t {
 	/*
 	 * index within address range
 	 * Initialized just to silence GCC.
 	 */
-	u_int32_t i = 0;
-	bool s;
+	let mut i: u32 = 0;
+	let s: bool;
 
 	DBG(DBG_CONTROL, {
-		char rbuf[RANGETOT_BUF];
-		char thatidbuf[IDTOA_BUF];
-		char abuf[ADDRTOT_BUF];
+		let rbuf: [char, ..RANGETOT_BUF];
+		let thatidbuf: [char, ..IDTOA_BUF];
+		let abuf: [char, ..ADDRTOT_BUF];
 
-		rangetot(&c->pool->r, 0, rbuf, sizeof(rbuf));
-		idtoa(&c->spd.that.id, thatidbuf, sizeof(thatidbuf));
-		addrtot(&c->spd.that.client.addr, 0, abuf, sizeof(abuf));
+		rangetot(&c.pool.r, 0, rbuf, mem::size_of_val(rbuf));
+		idtoa(&c.spd.that.id, thatidbuf, mem::size_of_val(thatidbuf));
+		addrtot(&c.spd.that.client.addr, 0, abuf, mem::size_of_val(abuf));
 
 		/* ??? what is that.client.addr and why do we care? */
 		DBG_log("request lease from addresspool %s reference count %u thatid '%s' that.client.addr %s",
-			rbuf, c->pool->pool_refcount, thatidbuf, abuf);
+			rbuf, c.pool.pool_refcount, thatidbuf, abuf);
 	});
 
 	s = share_lease(c, &i);
@@ -320,43 +322,46 @@ err_t lease_an_address(const struct connection *c,
 		 * cannot find or cannot share an existing lease:
 		 * allocate a new one
 		 */
-		const u_int32_t size = c->pool->size;
-		struct lease_addr **pp;
-		struct lease_addr *p;
-		struct lease_addr *ll = NULL;	/* longest lingerer */
+		let size: u32 = c.pool.size;
+		let pp: Box<Box<lease_addr>>;
+		let p: Box<lease_addr>;
+		let ll: Box<lease_addr>;	/* longest lingerer */
 
-		for (pp = &c->pool->leases; (p = *pp) != NULL; pp = &p->next) {
+		for pp in &c.pool.leases {
 			/* check that list of leases is
 			 * monotonically increasing.
 			 */
-			passert(p->index >= i);
-			if (p->index > i)
+			passert(p.index >= i);
+			if p.index > i {
 				break;
+			}
 			/* remember the longest lingering lease found */
-			if (p->refcnt == 0 &&
+			if p.refcnt == 0 &&
 			    (ll == NULL ||
-			     monobefore(ll->lingering_since, p->lingering_since)))
-				ll = p;
+			     monobefore(ll.lingering_since, p.lingering_since)) {
+			    	ll = p;	
+			    }
+				
 			/* Subtle point: this addition won't overflow.
 			 * 0.0.0.0 cannot be in a range
 			 * so the size will be less than 2^32.
 			 * No index can equal size
 			 * so i cannot exceed it.
 			 */
-			i = p->index + 1;
+			i = p.index + 1;
 		}
 
-		if (i < size) {
+		if i < size {
 			/* we can allocate a new address and lease */
-			struct lease_addr *a = alloc_thing(struct lease_addr, "address lease entry");
+			let a: Box<lease_addr> = alloc_thing(lease_addr, "address lease entry");
 
-			a->index = i;
-			a->refcnt = 1;
-			c->pool->used++;
+			a.index = i;
+			a.refcnt = 1;
+			c.pool.used += 1;
 
-			duplicate_id(&a->thatid, &c->spd.that.id);
+			duplicate_id(&a.thatid, &c.spd.that.id);
 
-			a->next = p;
+			a.next = p;
 			*pp = a;
 
 			DBG(DBG_CONTROLMORE,
@@ -364,46 +369,48 @@ err_t lease_an_address(const struct connection *c,
 		} else if (ll != NULL) {
 			/* we take over this lingering lease */
 			DBG(DBG_CONTROLMORE, {
-				char thatidbuf[IDTOA_BUF];
+				let thatidbuf: [char, ..IDTOA_BUF];
 
-				idtoa(&ll->thatid, thatidbuf, sizeof(thatidbuf));
+				idtoa(&ll.thatid, thatidbuf, mem::size_of_val(thatidbuf));
 				DBG_log("grabbed lingering lease index %u from %s",
 					i, thatidbuf);
 			});
-			free_id_content(&ll->thatid);
-			duplicate_id(&ll->thatid, &c->spd.that.id);
-			c->pool->lingering--;
-			ll->refcnt++;
-			i = ll->index;
+			free_id_content(&ll.thatid);
+			duplicate_id(&ll.thatid, &c.spd.that.id);
+			c.pool.lingering -= -1;
+			ll.refcnt += 1;
+			i = ll.index;
 		} else {
 			DBG(DBG_CONTROL,
 			    DBG_log("no free address within pool; size %u, used %u, lingering %u",
-				size, c->pool->used, c->pool->lingering));
-			passert(size == c->pool->used);
+				size, c.pool.used, c.pool.lingering));
+			passert(size == c.pool.used);
 			return "no free address in addresspool";
 		}
 	}
 
 	/* convert index i in range to an IP_address */
 	{
-		uint32_t addr = ntohl(c->pool->r.start.u.v4.sin_addr.s_addr) + i;
-		uint32_t addr_nw = htonl(addr);
-		err_t e = initaddr((unsigned char *)&addr_nw, sizeof(addr_nw),
+		let addr: u32 = ntohl(c.pool.r.start.u.v4.sin_addr.s_addr) + i;
+		let addr_nw: u32 = htonl(addr);
+		let e: err_t = initaddr(&addr_nw, mem::size_of_val(addr_nw),
 			     AF_INET, ipa);
 
-		if (e != NULL)
+		if e != NULL {
 			return e;
+		}
 	}
-	DBG(DBG_CONTROL, {
-		char rbuf[RANGETOT_BUF];
-		char thatidbuf[IDTOA_BUF];
-		char abuf[ADDRTOT_BUF];
-		char lbuf[ADDRTOT_BUF];
 
-		rangetot(&c->pool->r, 0, rbuf, sizeof(rbuf));
-		idtoa(&c->spd.that.id, thatidbuf, sizeof(thatidbuf));
-		addrtot(&c->spd.that.client.addr, 0, abuf, sizeof(abuf));
-		addrtot(ipa, 0, lbuf, sizeof(lbuf));
+	DBG(DBG_CONTROL, {
+		let rbuf: [char, ..RANGETOT_BUF];
+		let thatidbuf: [char, ..IDTOA_BUF];
+		let abuf: [char, ..ADDRTOT_BUF];
+		let lbuf: [char, ..ADDRTOT_BUF];
+
+		rangetot(&c.pool.r, 0, rbuf, mem::size_of_val(rbuf));
+		idtoa(&c.spd.that.id, thatidbuf, mem::size_of_val(thatidbuf));
+		addrtot(&c.spd.that.client.addr, 0, abuf, mem::size_of_val(abuf));
+		addrtot(ipa, 0, lbuf, mem::size_of_val(lbuf));
 
 		DBG_log("%s lease %s from addresspool %s to that.client.addr %s thatid '%s'",
 			match s { true => "re-use", false => "new"},
@@ -413,19 +420,19 @@ err_t lease_an_address(const struct connection *c,
 	return NULL;
 }
 
-static void free_addresspool(struct ip_pool *pool)
-{
-	struct ip_pool **pp;
-	struct ip_pool *p;
+pub fn free_addresspool(pool: &ip_pool) {
+	let pp: Box<Box<ip_pool>>;
+	let p: Box<ip_pool>;
 
 	/* search for pool in list of pools so we can unlink it */
-	if (pool == NULL)
+	if pool == NULL {
 		return;
+	}
 
-	for (pp = &pluto_pools; (p = *pp) != NULL; pp = &p->next) {
-		if (p == pool) {
-			*pp = p->next;	/* unlink pool */
-			free_lease_list(&pool->leases);
+	for pp in &pluto_pools {
+		if p == pool {
+			*pp = p.next;	/* unlink pool */
+			free_lease_list(&pool.leases);
 			pfree(pool);
 			return;
 		}
@@ -434,31 +441,29 @@ static void free_addresspool(struct ip_pool *pool)
 		pool);
 }
 
-void unreference_addresspool(struct connection *c)
-{
-	struct ip_pool *pool = c->pool;
+pub fn unreference_addresspool(c: &connection) {
+	let pool: Box<ip_pool> = c.pool;
 
 	DBG(DBG_CONTROLMORE, DBG_log("unreference addresspool of conn %s [%lu] kind %s refcnt %u",
-				c->name, c->instance_serial,
+				c.name, c.instance_serial,
 				enum_name(&connection_kind_names,
-					c->kind), pool->pool_refcount));
+					c.kind), pool.pool_refcount));
 
-	passert(pool->pool_refcount > 0);
+	passert(pool.pool_refcount > 0);
 
-	pool->pool_refcount--;
-	if (pool->pool_refcount == 0) {
+	pool.pool_refcount -= 1;
+	if (pool.pool_refcount == 0) {
 		DBG(DBG_CONTROLMORE,
 				DBG_log("freeing memory for addresspool ptr %p",
 					pool));
 		free_addresspool(pool);
 	}
 
-	c->pool = NULL;
+	c.pool = NULL;
 }
 
-void reference_addresspool(struct ip_pool *pool)
-{
-	pool->pool_refcount++;
+pub fn reference_addresspool(pool: &ip_pool) {
+	pool.pool_refcount += 1;
 }
 
 /*
@@ -466,32 +471,31 @@ void reference_addresspool(struct ip_pool *pool)
  * If a pool overlaps, an error is logged AND returned
  * *pool is set to the entry found; NULL if none found.
  */
-err_t find_addresspool(const ip_range *pool_range, struct ip_pool **pool)
-{
-	struct ip_pool *h;
+pub fn find_addresspool(pool_range: &ip_range, pool: &Box<Box<ip_pool>>) -> err_t {
+	let h: Box<ip_pool>;
 
 	*pool = NULL;	/* nothing found (yet) */
-	for (h = pluto_pools; h != NULL; h = h->next) {
-		const ip_range *a = pool_range;
-		const ip_range *b = &h->r;
+	for h in pluto_pools {
+		let a = pool_range;
+		let b = &h.r;
 
-		int sc = addrcmp(&a->start, &b->start);
+		let sc: int = addrcmp(&a.start, &b.start);
 
-		if (sc == 0 && addrcmp(&a->end, &b->end) == 0) {
+		if sc == 0 && addrcmp(&a.end, &b.end) == 0 {
 			/* exact match */
 			*pool = h;
 			break;
-		} else if (match sc < 0 { 
-					true => addrcmp(&a->end, &b->start) < 0,
-					false => addrcmp(&a->start, &b->end) > 0 }) {
+		} else if match sc < 0 { 
+					true => addrcmp(&a.end, &b.start) < 0,
+					false => addrcmp(&a.start, &b.end) > 0 } {
 			/* before or after */
 		} else {
 			/* overlap */
-			char prbuf[RANGETOT_BUF];
-			char hbuf[RANGETOT_BUF];
+			let prbuf: [char, ..RANGETOT_BUF];
+			let hbuf: [char, ..RANGETOT_BUF];
 
-			rangetot(pool_range, 0, prbuf, sizeof(prbuf));
-			rangetot(&h->r, 0, hbuf, sizeof(hbuf));
+			rangetot(pool_range, 0, prbuf, mem::size_of_val(prbuf));
+			rangetot(&h.r, 0, hbuf, mem::size_of_val(hbuf));
 			loglog(RC_CLASH,
 				"ERROR: new addresspool %s INEXACTLY OVERLAPS with existing one %s.",
 					prbuf, hbuf);
@@ -507,46 +511,45 @@ err_t find_addresspool(const ip_range *pool_range, struct ip_pool **pool)
  * - Only IPv4 allowed.
  * - The range must be non-empty
  */
-struct ip_pool *install_addresspool(const ip_range *pool_range)
-{
-	struct ip_pool **head = &pluto_pools;
-	struct ip_pool *p;
-	err_t ugh = find_addresspool(pool_range, &p);
+pub fn install_addresspool(pool_range: &ip_range) -> &ip_pool {
+	let head: Box<Box<ip_pool>> = &pluto_pools;
+	let p: Box<ip_pool>;
+	let ugh: err_t = find_addresspool(pool_range, &p);
 
-	if (ugh != NULL) {
+	if ugh != NULL {
 		/* some problem: refuse to install bad addresspool */
 		/* ??? Assume diagnostic already logged? */
-	} else if (p != NULL) {
+	} else if p != NULL {
 		/* re-use existing pool p */
 		reference_addresspool(p);
 		DBG(DBG_CONTROLMORE, {
-			char rbuf[RANGETOT_BUF];
+			let rbuf:[char, ..RANGETOT_BUF];
 
-			rangetot(&p->r, 0, rbuf, sizeof(rbuf));
+			rangetot(&p.r, 0, rbuf, mem::size_of_val(rbuf));
 			DBG_log("re-use addresspool %s exists ref count %u used %u size %u ptr %p re-use it",
-				rbuf, p->pool_refcount, p->used, p->size, p);
+				rbuf, p.pool_refcount, p.used, p.size, p);
 		});
 	} else {
 		/* make a new pool */
-		p = alloc_thing(struct ip_pool, "addresspool entry");
+		p = alloc_thing(ip_pool, "addresspool entry");
 
-		p->pool_refcount = 0;
+		p.pool_refcount = 0;
 		reference_addresspool(p);
-		p->r = *pool_range;
-		p->size = ntohl(p->r.end.u.v4.sin_addr.s_addr) -
-			  ntohl(p->r.start.u.v4.sin_addr.s_addr) + 1;
-		p->used = 0;
-		p->lingering = 0;
+		p.r = *pool_range;
+		p.size = ntohl(p.r.end.u.v4.sin_addr.s_addr) -
+			  ntohl(p.r.start.u.v4.sin_addr.s_addr) + 1;
+		p.used = 0;
+		p.lingering = 0;
 
 		DBG(DBG_CONTROLMORE, {
-			char rbuf[RANGETOT_BUF];
+			let rbuf: [char, ..RANGETOT_BUF];
 
-			rangetot(&p->r, 0, rbuf, sizeof(rbuf));
+			rangetot(&p.r, 0, rbuf, mem::size_of_val(rbuf));
 			DBG_log("add new addresspool to global pools %s size %d ptr %p",
-				rbuf, p->size, p);
+				rbuf, p.size, p);
 		});
-		p->leases = NULL;
-		p->next = *head;
+		p.leases = NULL;
+		p.next = *head;
 		*head = p;
 	}
 	return p;
