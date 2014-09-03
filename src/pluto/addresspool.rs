@@ -40,69 +40,37 @@ use std::mem;
 
 mod addresspool {
 
-/*
- * A pool is a range of IPv4 addresses to be individually allocated.
- * A connection may have a pool.
- * That pool may be shared with other connections (hence the reference count).
- *
- * A pool has a linked list of leases.
- * This list is in monotonically increasing order.
- */
-struct ip_pool {
-	pool_refcount : uint,	/* reference counted! */
-	r: ip_range,
-	size: u32,		/* number of addresses within range */
-	used: u32,		/* number of addresses in use (includes lingering) */
-	lingering: u32,	/* number of lingering addresses */
-	leases: lease_addr,	/* monotonically increasing index values */
-	next: ip_pool	/* next pool */
+struct ip_pool_old {
+	refcnt: uint,    /* reference counted! */
+	start: ip_address,
+	end: ip_address,
+	size: i32,
+	lease_list: &lease_addr_list
 }
 
-/*
- * A lease is an assignment of a single address from a particular pool.
- *
- * Leases are shared between appropriate connections.  Appropriate means
- * ones with the same thatid, as long as it isn't ID_NONE and uniqueIDs
- * is in force.  could_share_lease captures this distinction.
- *
- * Because leases are shared, they are reference-counted.
- * (Since we don't (yet?) free leases that could be shared,
- * we don't actually need reference counting.)
- *
- * When a lease ends, if it could not be shared, it is freed.
- * Otherwise it "lingers" so that the same client (based on ID) can later
- * be assigned the same address from the pool.
- *
- * In the future we may implement code to delete a lingering lease to free
- * the address if there is no free address in the pool.
- *
- * Life cycle:
- *
- * - created by lease_an_address if an existing or lingering lease for the
- *   same thatid isn't found.
- *
- * - released (to linger or freed) by rel_lease_addr.
- *
- * - current code never frees a lease that could be shared.
- *   ??? This constitutes a leak.
- */
+struct lease_addr {
+	index: u32,        /* index in addresspool. The first address 0 */
+	thatid:  id,       /* from connection */
+	starts: time_t,    /* first time it was leased to this id */
+	ends: time_t,       /* 0 is never. > 0 is when it ended */
+	next: lease_addr
+}
 
-pub fn could_share_lease(c: connection) { 
-	c.spd.that.id.kind != ID_NONE && uniqueIDs
+struct ip_pool {
+	refcnt: uint,    /* reference counted! */
+	start: ip_address,
+	end: ip_address,
+	size: u32,
+	used: u32,
+	cached: u32,
+	lease: &lease_addr,
+	next: &ip_pool
 }
 
 struct monotime_t { 
 	mono_secs: time_t 
 }
 
-struct lease_addr {
-	index: u32,	/* range start + index == IP address */
-	thatid: id,	/* from connection */    /* TODO: id - type struct, from include/id.h */
-	refcnt: uint,	/* reference counted */
-	lingering_since: monotime_t,	/* when did this begin to linger */   /* TODO: type from  <time.h> */
-
-	next: lease_addr	/* next in pool's list of leases */
-}
 
 /*
  * head of chained addresspool list
@@ -120,7 +88,7 @@ pub fn free_lease_entry(h: lease_addr) -> lease_addr
 	DBG(DBG_CONTROL, DBG_log("addresspool free lease entry ptr %p refcnt %u",
 		h, h.refcnt));
 
-	free_id_content(h.thatid);
+	//free_id_content(h.thatid);
 	//pfree(h);
 	return next;
 }
