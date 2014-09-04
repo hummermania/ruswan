@@ -38,6 +38,9 @@
 
 use std::mem;
 
+use self::connections::{};
+
+
 mod addresspool {
 
 struct ip_pool_old {
@@ -111,7 +114,7 @@ pub fn free_lease_list(mut head: lease_addr)
  * It the index isn't found, NULL is returned (not a pointer to the
  * pointer to NULL).
  */
-pub fn ref_to_lease(pool: ip_pool, i: u32 ) -> Box<Box<lease_addr>> {
+pub fn ref_to_lease(pool: ip_pool, i: u32 ) -> Option<Box<Box<lease_addr>>> {
 	
 	let pp: Box<Box<lease_addr>>; // TODO: Check if double boxed is realy needed 
 	let p: Box<lease_addr>;
@@ -214,10 +217,10 @@ pub fn rel_lease_addr(c: &connection) {
  */
 pub fn share_lease(c: &connection, index: u32) -> bool {
 	let mut p: Box<lease_addr>;
-	let mut r: bool = FALSE;
+	let mut r: bool = false;
 
 	if !could_share_lease(c) {
-		return FALSE;
+		return false;
 	}
 
 	for p in c.pool.leases {

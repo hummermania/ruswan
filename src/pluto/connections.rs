@@ -1,18 +1,5 @@
 /* information about connections between hosts and clients
- *
- * Copyright (C) 1998-2001,2010-2013 D. Hugh Redelmeier <hugh@mimosa.com>
- * Copyright (C) 2005-2007 Michael Richardson <mcr@xelerance.com>
- * Copyright (C) 2006-2010 Paul Wouters <paul@xelerance.com>
- * Copyright (C) 2007 Ken Bantoft <ken@cyclops.xelerance.com>
- * Copyright (C) 2008-2010 David McCullough <david_mccullough@securecomputing.com>
- * Copyright (C) 2012 Paul Wouters <paul@libreswan.org>
- * Copyright (C) 2012 Philippe Vouters <philippe.vouters@laposte.net>
- * Copyright (C) 2013 Kim Heino <b@bbbs.net>
- * Copyright (C) 2013 Antony Antony <antony@phenome.org>
- * Copyright (C) 2013 Tuomo Soini <tis@foobar.fi>
- * Copyright (C) 2013 Paul Wouters <pwouters@redhat.com>
- * Copyright (C) 2013 Matt Rogers <mrogers@redhat.com>
- *
+
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
  * Free Software Foundation; either version 2 of the License, or (at your
@@ -24,6 +11,7 @@
  * for more details.
  *
  */
+
 
 /* There are two kinds of connections:
  * - ISAKMP connections, between hosts (for IKE communication)
@@ -117,8 +105,10 @@
  *   as the original policy, even though its subnets might be smaller.
  * - display format: n,m
  */
+
+/*
 typedef unsigned long policy_prio_t;
-#define BOTTOM_PRIO   ((policy_prio_t)0)        /* smaller than any real prio */
+#define BOTTOM_PRIO   ((policy_prio_t)0)        // smaller than any real prio 
 #define set_policy_prio(c) { (c)->prio = \
 				     ((policy_prio_t)(c)->spd.this.client. \
 				      maskbits << 16) \
@@ -129,16 +119,27 @@ typedef unsigned long policy_prio_t;
 extern void fmt_policy_prio(policy_prio_t pp, char buf[POLICY_PRIO_BUF]);
 
 #ifdef XAUTH_HAVE_PAM
-# include <security/pam_appl.h>	/* needed for pam_handle_t */
-#endif
+# include <security/pam_appl.h>	// needed for pam_handle_t 
+#endif  */
 
 /* Note that we include this even if not X509, because we do not want the
  * structures to change lots.
  */
+
+ /*
 #include "x509.h"
 #include "certs.h"
 #include "defs.h"
 #include <sys/queue.h>
+*/
+#![crate_id = "connections#0.0.1"]
+#![crate_type = "rlib"]
+#![crate_name = "connections"]
+
+//mod connections {
+
+
+#![feature(macro_rules)] // Enable macro_rules!
 
 struct virtual_t;
 
@@ -146,104 +147,114 @@ struct ietfAttr;        /* forward declaration of ietfAttr defined in ac.h */
 struct host_pair;       /* opaque type */
 
 struct end {
-	struct id id;
-	bool left;
+	id: id,
+	left: bool,
 
-	enum keyword_host host_type;
-	char  *host_addr_name;   /* string version from whack */
-	ip_address
-		host_addr,
-		host_nexthop,
-		host_srcip;
-	ip_subnet client;
+	host_type: keyword_host,
+	host_addr_name: &str,   /* string version from whack */
+	
+	host_addr: ip_address,
+	host_nexthop: ip_address,
+	host_srcip: ip_address,
+	client: ip_subnet,
 
-	bool key_from_DNS_on_demand;
-	bool has_client;
-	bool has_client_wildcard;
-	bool has_port_wildcard;
-	bool has_id_wildcards;
-	char *updown;
-	u_int16_t host_port;            /* where the IKE port is */
-	bool host_port_specific;        /* if TRUE, then IKE ports are tested for*/
-	u_int16_t port;                 /* port number, if per-port keying. */
-	u_int8_t protocol;              /* transport-protocol number, if per-X keying.*/
+	key_from_DNS_on_demand: bool,
+	has_client: bool,
+	has_client_wildcard: bool,
+	has_port_wildcard: bool,
+	has_id_wildcards: bool,
+	updown: &str,
+	host_port: u16,                 /* where the IKE port is */
+	host_port_specific: bool,       /* if TRUE, then IKE ports are tested for*/
+	port: u16,                      /* port number, if per-port keying. */
+	protocol: u8,                   /* transport-protocol number, if per-X keying.*/
 
-	enum certpolicy sendcert;       /* whether or not to send the certificate */
-	char   *cert_filename;          /* where we got the certificate */
-	cert_t cert;                    /* end certificate */
+	sendcert: certpolicy,           /* whether or not to send the certificate */
+	cert_filename: &str,            /* where we got the certificate */
+	cert: cert_t,                   /* end certificate */
 
-	chunk_t ca;                     /* CA distinguished name */
-	struct ietfAttrList *groups;    /* access control groups */
+	ca: chunk_t,                    /* CA distinguished name */
+	groups: &ietfAttrList,          /* access control groups */
 
-	struct virtual_t *virt;
+	virt: &virtual_t,
 
-	bool xauth_server;
-	bool xauth_client;
-	char *xauth_name;
-	char *xauth_password;
-	ip_range pool_range;    /* store start of v4 addresspool */
-	bool modecfg_server;    /* Give local addresses to tunnel's end */
-	bool modecfg_client;    /* request address for local end */
-
-};
+	xauth_server: bool,
+	xauth_client: bool,
+	xauth_name: &str,
+	xauth_password: &str,
+	pool_range: ip_range,           /* store start of v4 addresspool */
+	modecfg_server: bool,           /* Give local addresses to tunnel's end */
+	modecfg_client: bool            /* request address for local end */
+}
 
 struct spd_route {
-	struct spd_route *next;
-	struct end this;
-	struct end that;
-	so_serial_t eroute_owner;
-	enum routing_t routing; /* level of routing in place */
-	uint32_t reqid;
-};
+	next: spd_route,
+	this: end,
+	that: end,
+	eroute_owner: so_serial_t,
+	routing: routing_t,          /* level of routing in place */
+	reqid: u32
+}
 
-struct connection {
-	char *name;
-	char *connalias;
-	lset_t policy;
-	time_t sa_ike_life_seconds;
-	time_t sa_ipsec_life_seconds;
-	time_t sa_rekey_margin;
-	unsigned long sa_rekey_fuzz;
-	unsigned long sa_keying_tries;
-	unsigned long sa_priority;
-	unsigned long sa_reqid;
-	int encapsulation;
+pub struct connection {
+	name: &str,
+	connalias: &str,
+	policy: lset_t,
+	sa_ike_life_seconds: time_t,
+	sa_ipsec_life_seconds: time_t,
+	sa_rekey_margin: time_t,
+	sa_rekey_fuzz: u32,
+	sa_keying_tries: u32,
+	sa_priority: u32,
+	sa_reqid: u32,
+	encapsulation: int,
 
 	/* RFC 3706 DPD */
-	time_t dpd_delay;               /* time between checks */
-	time_t dpd_timeout;             /* time after which we are dead */
-	enum dpd_action dpd_action;     /* what to do when we die */
+	dpd_delay: time_t,               /* time between checks */
+	dpd_timeout: time_t,             /* time after which we are dead */
+	dpd_action: dpd_action,          /* what to do when we die */
 
-	bool nat_keepalive;             /* Suppress sending NAT-T Keep-Alives */
-	bool initial_contact;           /* Send INITIAL_CONTACT (RFC-2407) payload? */
-	bool cisco_unity;           /* Send INITIAL_CONTACT (RFC-2407) payload? */
-	bool send_vendorid;           /* Send our vendorid? Security vs Debugging help */
-	bool sha2_truncbug;
-	enum ikev1_natt_policy ikev1_natt; /* whether or not to send IKEv1 draft/rfc NATT VIDs */
+	nat_keepalive: bool,             /* Suppress sending NAT-T Keep-Alives */
+	initial_contact: bool,           /* Send INITIAL_CONTACT (RFC-2407) payload? */
+	cisco_unity: bool,               /* Send INITIAL_CONTACT (RFC-2407) payload? */
+	send_vendorid: bool,             /* Send our vendorid? Security vs Debugging help */
+	sha2_truncbug: bool,
+	ikev1_natt: ikev1_natt_policy,   /* whether or not to send IKEv1 draft/rfc NATT VIDs */
 
 	/*Network Manager support*/
-#ifdef HAVE_NM
-	bool nmconfigured;
-#endif
+//#ifdef HAVE_NM     // TODO: Find the Rust #ifdef analog
+	nmconfigured: bool,
+//#endif
 
-#ifdef HAVE_LABELED_IPSEC
-	bool loopback;
-	bool labeled_ipsec;
-	char *policy_label;
-#endif
+//#ifdef HAVE_LABELED_IPSEC   // TODO: Find the Rust #ifdef analog
+	loopback: bool,
+	labeled_ipsec: bool,
+	policy_label: &str,
+//#endif
 
 	/*Cisco interop: remote peer type*/
-	enum keyword_remotepeertype remotepeertype;
+	remotepeertype: keyword_remotepeertype,
 
-	enum keyword_xauthby xauthby;
-	enum keyword_xauthfail xauthfail;
+	xauthby: keyword_xauthby,
+	xauthfail: keyword_xauthfail,
 
-	bool forceencaps;                       /* always use NAT-T encap */
+	forceencaps: bool,                       /* always use NAT-T encap */
 
-	char              *log_file_name;       /* name of log file */
-	FILE              *log_file;            /* possibly open FILE */
-	CIRCLEQ_ENTRY(connection) log_link;     /* linked list of open conns {} */
-	bool log_file_err;                      /* only bitch once */
+	log_file_name: &str,                    /* name of log file */
+	log_file: FILE,                         /* possibly open FILE */
+
+	//CIRCLEQ_ENTRY(connection) log_link;     /* linked list of open conns {} */
+
+	/* Definition from libreswan/include/sysqueue.h
+	#define CIRCLEQ_ENTRY(type)                                             \
+	struct {                                                                \
+		struct type *cqe_next;  // next element               \
+		struct type *cqe_prev;  // previous element           \
+	} 
+	*/
+
+
+	log_file_err: bool,                      /* only bitch once */
 
 	struct spd_route spd;
 
@@ -334,33 +345,24 @@ extern int initiate_ondemand(const ip_address *our_client,
 			     , struct xfrm_user_sec_ctx_ike *uctx
 #endif
 			     , err_t why);
-extern void terminate_connection(const char *nm);
-extern void release_connection(struct connection *c, bool relations);
-extern void delete_connection(struct connection *c, bool relations);
-extern void delete_connections_by_name(const char *name, bool strict);
-extern void delete_every_connection(void);
-extern char *add_group_instance(struct connection *group,
-				const ip_subnet *target);
-extern void remove_group_instance(const struct connection *group,
-				  const char *name);
-extern void release_dead_interfaces(void);
-extern void check_orientations(void);
-extern struct connection *route_owner(struct connection *c,
-				      struct spd_route *cur_spd,
-				      struct spd_route **srp,
-				      struct connection **erop,
-				      struct spd_route **esrp);
-extern struct connection *shunt_owner(const ip_subnet *ours,
-				      const ip_subnet *his);
 
-extern bool uniqueIDs;  /* --uniqueids? */
-extern void ISAKMP_SA_established(struct connection *c, so_serial_t serial);
 
+/*
 #define his_id_was_instantiated(c) ((c)->kind == CK_INSTANCE \
 				    && (id_is_ipaddr(&(c)->spd.that.id) ? \
 					sameaddr(&(c)->spd.that.id.ip_addr, \
 						 &(c)->spd.that.host_addr) : \
 					TRUE))
+*/
+
+macro_rules! his_id_was_instantiated {
+	($c: ident) => {
+		match $c.kind == CK_INSTANCE && id_is_ipaddr($c.spd.that.id) {
+			true => sameaddr($c.spd.that.id.ip_addr, $c.spd.that.host_addr),
+			false => true
+		};
+	}
+}
 
 struct state;   /* forward declaration of tag (defined in state.h) */
 extern struct connection
@@ -412,11 +414,17 @@ extern struct connection
 					 const ip_address *peer_client);
 
 /* worst case: "[" serial "] " myclient "=== ..." peer "===" hisclient '\0' */
-#define CONN_INST_BUF \
-	(2 + 10 + 1 + SUBNETTOT_BUF + 7 + ADDRTOT_BUF + 3 + SUBNETTOT_BUF + 1)
+
+
+macro_rules! CONN_INST_BUF {
+	() => {
+		2 + 10 + 1 + SUBNETTOT_BUF + 7 + ADDRTOT_BUF + 3 + SUBNETTOT_BUF + 1
+	} 
+}
+
 
 extern char *fmt_conn_instance(const struct connection *c,
-			       char buf[CONN_INST_BUF]);
+			       char buf[CONN_INST_BUF()]);
 
 /* operations on "pending", the structure representing Quick Mode
  * negotiations delayed until a Keying Channel has been negotiated.
@@ -435,84 +443,20 @@ extern void add_pending(int whack_sock,
 #endif
 			);
 
-extern void release_pending_whacks(struct state *st, err_t story);
-extern void unpend(struct state *st);
-extern void update_pending(struct state *os, struct state *ns);
-extern void flush_pending_by_state(struct state *st);
-extern void connection_discard(struct connection *c);
-
 /* A template connection's eroute can be eclipsed by
  * either a %hold or an eroute for an instance iff
  * the template is a /32 -> /32.  This requires some special casing.
  */
+/* 
 #define eclipsable(sr) (subnetishost(&(sr)->this.client) && \
 			subnetishost(&(sr)->that.client))
-extern long eclipse_count;
-extern struct connection *eclipsed(struct connection *c, struct spd_route **);
+*/
 
-/* print connection status */
-
-extern void show_one_connection(struct connection *c);
-extern void show_connections_status(void);
-extern int  connection_compare(const struct connection *ca,
-			       const struct connection *cb);
-extern void update_host_pair(const char *why, struct connection *c,
-			     const ip_address *myaddr, u_int16_t myport,
-			     const ip_address *hisaddr, u_int16_t hisport);
-
-/* export to pending.c */
-extern void host_pair_enqueue_pending(const struct connection *c,
-				      struct pending *p,
-				      struct pending **pnext);
-struct pending **host_pair_first_pending(const struct connection *c);
-
-void connection_check_ddns(void);
-
-void connection_check_phase2(void);
-void init_connections(void);
-
-extern void setup_client_ports(struct spd_route *sr);
-
-extern int foreach_connection_by_alias(const char *alias,
-				       int (*f)(struct connection *c,
-						void *arg),
-				       void *arg);
-
-extern struct connection *unoriented_connections;
-
-extern void update_host_pairs(struct connection *c);
-
-
-
-/*
- * information about connections between hosts and clients
- *
- * Copyright (C) 1998-2002,2010,2013 D. Hugh Redelmeier <hugh@mimosa.com>
- * Copyright (C) 2003-2008 Michael Richardson <mcr@xelerance.com>
- * Copyright (C) 2003-2011 Paul Wouters <paul@xelerance.com>
- * Copyright (C) 2008-2009 David McCullough <david_mccullough@securecomputing.com>
- * Copyright (C) 2009-2011 Avesh Agarwal <avagarwa@redhat.com>
- * Copyright (C) 2010 Bart Trojanowski <bart@jukie.net>
- * Copyright (C) 2010 Shinichi Furuso <Shinichi.Furuso@jp.sony.com>
- * Copyright (C) 2010,2013 Tuomo Soini <tis@foobar.fi>
- * Copyright (C) 2012-2013 Paul Wouters <paul@libreswan.org>
- * Copyright (C) 2012 Philippe Vouters <Philippe.Vouters@laposte.net>
- * Copyright (C) 2012 Bram <bram-bcrafjna-erqzvar@spam.wizbit.be>
- * Copyright (C) 2013 Kim B. Heino <b@bbbs.net>
- * Copyright (C) 2013 Antony Antony <antony@phenome.org>
- * Copyright (C) 2013 Matt Rogers <mrogers@redhat.com>
- * Copyright (C) 2013 Florian Weimer <fweimer@redhat.com>
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the
- * Free Software Foundation; either version 2 of the License, or (at your
- * option) any later version.  See <http://www.fsf.org/copyleft/gpl.txt>.
- *
- * This program is distributed in the hope that it will be useful, but
- * WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
- * or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
- * for more details.
- */
+macro_rules! eclipsable {
+	($sr: ident) => {
+		subnetishost($sr.this.client) && subnetishost($sr.that.client)
+	}
+}
 
 #include <string.h>
 #include <stdio.h>
@@ -4390,3 +4334,5 @@ struct connection *eclipsed(struct connection *c, struct spd_route **esrp)
 	}
 	return ue;
 }
+
+//}
