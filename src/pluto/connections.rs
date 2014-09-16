@@ -146,7 +146,7 @@ struct virtual_t;
 struct ietfAttr;        /* forward declaration of ietfAttr defined in ac.h */
 struct host_pair;       /* opaque type */
 
-struct end {
+pub struct end {
 	id: id,
 	left: bool,
 
@@ -256,95 +256,98 @@ pub struct connection {
 
 	log_file_err: bool,                      /* only bitch once */
 
-	struct spd_route spd;
+	spd: spd_route,
 
 	/* internal fields: */
 
-	unsigned long instance_serial;
-	policy_prio_t prio;
-	bool instance_initiation_ok;            /* this is an instance of a policy that mandates initiate */
-	enum connection_kind kind;
-	const struct iface_port *interface;     /* filled in iff oriented */
+	instance_serial: u32,
+	prio: policy_prio_t,
+	instance_initiation_ok: bool,            /* this is an instance of a policy that mandates initiate */
+	kind: connection_kind,
+	interface: *const iface_port,     /* filled in iff oriented */
 
-	bool initiated;
-	bool failed_ikev2;      /* tried ikev2, but failed */
+	initiated: bool,
+	failed_ikev2: bool,      /* tried ikev2, but failed */
 
-	so_serial_t             /* state object serial number */
-		newest_isakmp_sa,
-		newest_ipsec_sa;
+	newest_isakmp_sa: so_serial_t, /* state object serial number */
+	newest_ipsec_sa: so_serial_t,
 
-	lset_t extra_debugging;
+	extra_debugging: lset_t,
 
 	/* note: if the client is the gateway, the following must be equal */
-	sa_family_t addr_family;        /* between gateways */
-	sa_family_t tunnel_addr_family; /* between clients */
+	addr_family: sa_family_t,        /* between gateways */
+	tunnel_addr_family: sa_family_t, /* between clients */
 
-	struct connection *policy_next; /* if multiple policies,
+	policy_next: &connection,   /* if multiple policies,
 	                                   next one to apply */
 
-	struct gw_info *gw_info;
-	struct alg_info_esp *alg_info_esp;
-	struct alg_info_ike *alg_info_ike;
+	gw_info: &gw_info,
+	alg_info_esp: &alg_info_esp,
+	alg_info_ike: &alg_info_ike,
 
-	struct host_pair *host_pair;    /* opaque type outside of connections.c/hostpair.c */
-	struct connection *hp_next;     /* host pair list link */
+	host_pair: &host_pair,    /* opaque type outside of connections.c/hostpair.c */
+	hp_next: &connection,     /* host pair list link */
 
-	struct connection *ac_next;     /* all connections list link */
+	ac_next: &connection,     /* all connections list link */
 
-	generalName_t *requested_ca;    /* collected certificate requests */
-#ifdef XAUTH_HAVE_PAM
-	pam_handle_t  *pamh;            /*  PAM handle for that connection  */
-#endif
-	char *dnshostname;
+	requested_ca: &generalName_t,    /* collected certificate requests */
+//#ifdef XAUTH_HAVE_PAM   // TODO: Replace #ifdef
+	pamh: pam_handle_t,            /*  PAM handle for that connection  */
+//#endif
+	dnshostname: &str,
 
-	ip_address modecfg_dns1;
-	ip_address modecfg_dns2;
-	struct ip_pool *pool; /*v4 addresspool as a range, start end */
-	char *cisco_dns_info; /* scratchpad for writing IP addresses */
-	char *modecfg_domain;
-	char *modecfg_banner;
+	modecfg_dns1: ip_address,
+	modecfg_dns2: ip_address,
+	pool: &ip_pool, /*v4 addresspool as a range, start end */
+	cisco_dns_info: &str, /* scratchpad for writing IP addresses */
+	modecfg_domain: &str,
+	modecfg_banner: &str,
 
-	u_int8_t metric;          /* metric for tunnel routes */
-	u_int16_t connmtu;          /* mtu for tunnel routes */
-	u_int32_t statsval;             /* track what we have told statsd */
-};
+	metric: u8,          /* metric for tunnel routes */
+	connmtu: u16,          /* mtu for tunnel routes */
+	statsval: u32             /* track what we have told statsd */
+}
 
-#define oriented(c) ((c).interface != NULL)
-extern bool orient(struct connection *c);
+macro_rules! oriented(
+ 	($c: ident) => { 
+ 		c.interface != None 
+	}
 
-extern bool same_peer_ids(const struct connection *c,
-			  const struct connection *d, const struct id *his_id);
+//extern bool orient(struct connection *c);
+
+//extern bool same_peer_ids(const struct connection *c,
+//			  const struct connection *d, const struct id *his_id);
 
 /* Format the topology of a connection end, leaving out defaults.
  * Largest left end looks like: client === host : port [ host_id ] --- hop
  * Note: if that==NULL, skip nexthop
  */
 #define END_BUF (SUBNETTOT_BUF + ADDRTOT_BUF + IDTOA_BUF + ADDRTOT_BUF + 10)
-extern size_t format_end(char *buf, size_t buf_len,
-			 const struct end *this, const struct end *that,
-			 bool is_left, lset_t policy);
+//extern size_t format_end(char *buf, size_t buf_len,
+//			 const struct end *this, const struct end *that,
+//			 bool is_left, lset_t policy);
 
 struct whack_message;   /* forward declaration of tag whack_msg */
-extern void add_connection(const struct whack_message *wm);
-extern void initiate_connection(const char *name,
-				int whackfd,
-				lset_t moredebug,
-				enum crypto_importance importance);
-extern void restart_connections_by_peer(struct connection *c);
+//extern void add_connection(const struct whack_message *wm);
+//extern void initiate_connection(const char *name,
+//				int whackfd,
+//				lset_t moredebug,
+//				enum crypto_importance importance);
+//extern void restart_connections_by_peer(struct connection *c);
 
-#ifdef HAVE_LABELED_IPSEC
+//#ifdef HAVE_LABELED_IPSEC  // TODO: Replace #ifdef
 struct xfrm_user_sec_ctx_ike; /* forward declaration */
-#endif
+//#endif
 
-extern int initiate_ondemand(const ip_address *our_client,
-			     const ip_address *peer_client,
-			     int transport_proto,
-			     bool held,
-			     int whackfd
-#ifdef HAVE_LABELED_IPSEC
-			     , struct xfrm_user_sec_ctx_ike *uctx
-#endif
-			     , err_t why);
+//extern int initiate_ondemand(const ip_address *our_client,
+//			     const ip_address *peer_client,
+//			     int transport_proto,
+//			     bool held,
+//			     int whackfd
+//#ifdef HAVE_LABELED_IPSEC
+//			     , struct xfrm_user_sec_ctx_ike *uctx
+//#endif
+//			     , err_t why);
 
 
 /*
@@ -355,7 +358,7 @@ extern int initiate_ondemand(const ip_address *our_client,
 					TRUE))
 */
 
-macro_rules! his_id_was_instantiated {
+macro_rules! his_id_was_instantiated { // TODO: Replace and refactor to uppercase
 	($c: ident) => {
 		match $c.kind == CK_INSTANCE && id_is_ipaddr($c.spd.that.id) {
 			true => sameaddr($c.spd.that.id.ip_addr, $c.spd.that.host_addr),
@@ -365,9 +368,10 @@ macro_rules! his_id_was_instantiated {
 }
 
 struct state;   /* forward declaration of tag (defined in state.h) */
-extern struct connection
-*con_by_name(const char *nm, bool strict);
+//extern struct connection
+//*con_by_name(const char *nm, bool strict);
 
+/*
 extern struct connection
 	*find_host_connection(const ip_address *me, u_int16_t my_port,
 		       const ip_address *him, u_int16_t his_port,
@@ -385,6 +389,7 @@ extern struct connection
 				      const ip_address *our_client,
 				      const ip_address *peer_client,
 				      int transport_proto);
+*/				      
 
 /* instantiating routines
  * Note: connection_discard() is in state.h because all its work
@@ -392,10 +397,12 @@ extern struct connection
  */
 struct gw_info;         /* forward declaration of tag (defined in dnskey.h) */
 struct alg_info;        /* forward declaration of tag (defined in alg_info.h) */
+/*
 extern struct connection *rw_instantiate(struct connection *c,
 					 const ip_address *him,
 					 const ip_subnet *his_net,
 					 const struct id *his_id);
+
 
 extern struct connection * instantiate(struct connection *c,
 				       const ip_address *him,
@@ -412,6 +419,7 @@ extern struct connection
 *build_outgoing_opportunistic_connection(struct gw_info *gw,
 					 const ip_address *our_client,
 					 const ip_address *peer_client);
+*/
 
 /* worst case: "[" serial "] " myclient "=== ..." peer "===" hisclient '\0' */
 
@@ -423,8 +431,8 @@ macro_rules! CONN_INST_BUF {
 }
 
 
-extern char *fmt_conn_instance(const struct connection *c,
-			       char buf[CONN_INST_BUF()]);
+//extern char *fmt_conn_instance(const struct connection *c,
+//			       char buf[CONN_INST_BUF()]);
 
 /* operations on "pending", the structure representing Quick Mode
  * negotiations delayed until a Keying Channel has been negotiated.
@@ -432,6 +440,7 @@ extern char *fmt_conn_instance(const struct connection *c,
 
 struct pending; /* forward declaration (opaque outside connections.c) */
 
+/*
 extern void add_pending(int whack_sock,
 			struct state *isakmp_sa,
 			struct connection *c,
@@ -442,11 +451,13 @@ extern void add_pending(int whack_sock,
 			, struct xfrm_user_sec_ctx_ike * uctx
 #endif
 			);
+*/
 
 /* A template connection's eroute can be eclipsed by
  * either a %hold or an eroute for an instance iff
  * the template is a /32 -> /32.  This requires some special casing.
  */
+
 /* 
 #define eclipsable(sr) (subnetishost(&(sr)->this.client) && \
 			subnetishost(&(sr)->that.client))
@@ -458,6 +469,9 @@ macro_rules! eclipsable {
 	}
 }
 
+// Part of connection.c file
+
+/*
 #include <string.h>
 #include <stdio.h>
 #include <stddef.h>
@@ -485,20 +499,20 @@ macro_rules! eclipsable {
 
 #include "defs.h"
 #include "ac.h"
-#include "connections.h" /* needs id.h */
+#include "connections.h" // needs id.h 
 #include "pending.h"
 #include "foodgroups.h"
 #include "packet.h"
-#include "demux.h" /* needs packet.h */
+#include "demux.h" // needs packet.h 
 #include "state.h"
 #include "timer.h"
-#include "ipsec_doi.h" /* needs demux.h and state.h */
+#include "ipsec_doi.h" // needs demux.h and state.h 
 #include "server.h"
-#include "kernel.h" /* needs connections.h */
+#include "kernel.h" // needs connections.h 
 #include "log.h"
 #include "keys.h"
-#include "adns.h" /* needs <resolv.h> */
-#include "dnskey.h" /* needs keys.h and adns.h */
+#include "adns.h" // needs <resolv.h> 
+#include "dnskey.h" // needs keys.h and adns.h 
 #include "whack.h"
 #include "alg_info.h"
 #include "spdb.h"
@@ -509,19 +523,20 @@ macro_rules! eclipsable {
 #include "addresspool.h"
 #include "nat_traversal.h"
 
-#include "virtual.h"	/* needs connections.h */
+#include "virtual.h"	// needs connections.h 
 
 #include "hostpair.h"
+*/
 
-struct connection *connections = NULL;
+connections: &connection = NULL;
 
-struct connection *unoriented_connections = NULL;
+unoriented_connections: &connection = NULL;
 
 
-static void unshare_ietfAttrList(ietfAttrList_t **listp)
-{
-	ietfAttrList_t *list = *listp;
+pub fn unshare_ietfAttrList(listp: &&ietfAttrList_t) -> {
+	let list: &&ietfAttrList_t = listp;
 
+	foreach
 	while (list != NULL) {
 		ietfAttrList_t *el =
 			alloc_thing(ietfAttrList_t, "ietfAttrList");

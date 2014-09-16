@@ -36,9 +36,11 @@
 #include "addresspool.h"
 */
 
+//extern crate connections;
+extern crate connections;
 use std::mem;
 
-use self::connections::{};
+
 
 
 mod addresspool {
@@ -86,6 +88,7 @@ static mut pluto_pools: ip_pool = None;
  */
 pub fn free_lease_entry(h: lease_addr) -> lease_addr
 {
+	test::test_mod.foo();
 	let mut next: lease_addr = h.next;
 
 	DBG(DBG_CONTROL, DBG_log("addresspool free lease entry ptr %p refcnt %u",
